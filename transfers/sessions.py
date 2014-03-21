@@ -13,31 +13,11 @@ transfers.sessions
 """
 
 import os
-import cookielib
 import requests
 from datetime import datetime
 from requests.hooks import dispatch_hook
 from requests.sessions import merge_hooks, merge_setting
-from requests.cookies import (
-        cookiejar_from_dict, RequestsCookieJar, merge_cookies)
-# 
-# from .compat import cookielib, OrderedDict, urljoin, urlparse, builtin_str
 
-#from .models import Request, PreparedRequest
-# from .utils import to_key_val_list, default_headers, to_native_string
-# from .exceptions import TooManyRedirects, InvalidSchema
-# from .structures import CaseInsensitiveDict
-# 
-# from .adapters import HTTPAdapter
-# 
-# 
-# from .status_codes import codes
-# REDIRECT_STATI = (
-#     codes.moved,  # 301
-#     codes.found,  # 302
-#     codes.other,  # 303
-#     codes.temporary_moved,  # 307
-# )
 # DEFAULT_REDIRECT_LIMIT = 30
 
 from .adapters import FTPAdapter
@@ -59,8 +39,6 @@ class FTPSession(requests.Session):
         'headers', 'auth', 'timeout', 'proxies', 'hooks',
         'verify', 'cert', 'prefetch', 'adapters', 'stream',
         'trust_env']
-
-    FoldingDict = None
 
     def __init__(self):
 
@@ -91,6 +69,13 @@ class FTPSession(requests.Session):
     def __exit__(self, *args):
         self.close()
 
+    def __getstate__(self):
+        return dict((attr, getattr(self, attr, None)) for attr in self.__attrs__)
+
+    def __setstate__(self, state):
+        for attr, value in state.items():
+            setattr(self, attr, value)
+
     def prepare_request(self, request):
         """Constructs a :class:`PreparedRequest <PreparedRequest>` for
         transmission and returns it. The :class:`PreparedRequest` has settings
@@ -100,16 +85,6 @@ class FTPSession(requests.Session):
         :param request: :class:`Request` instance to prepare with this
             session's settings.
         """
-        cookies = request.cookies or {}
-
-        # Bootstrap CookieJar.
-        if not isinstance(cookies, cookielib.CookieJar):
-            cookies = cookiejar_from_dict(cookies)
-
-        # Merge with session cookies
-        merged_cookies = merge_cookies(
-            merge_cookies(RequestsCookieJar(), self.cookies), cookies)
-
 
         # Set environment's basic authentication if not explicitly set.
         auth = request.auth
@@ -120,12 +95,6 @@ class FTPSession(requests.Session):
         p.prepare(
             method=request.method.upper(),
             url=request.url,
-            files=request.files,
-            data=request.data,
-            headers=merge_setting(request.headers, self.headers, dict_class=self.FoldingDict),
-            params=merge_setting(request.params, self.params),
-            auth=merge_setting(auth, self.auth),
-            cookies=merged_cookies,
             hooks=merge_hooks(request.hooks, self.hooks),
         )
         return p
@@ -485,10 +454,3 @@ class FTPSession(requests.Session):
 
         for key in keys_to_move:
             self.adapters[key] = self.adapters.pop(key)
-
-    def __getstate__(self):
-        return dict((attr, getattr(self, attr, None)) for attr in self.__attrs__)
-
-    def __setstate__(self, state):
-        for attr, value in state.items():
-            setattr(self, attr, value)

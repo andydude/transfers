@@ -1,4 +1,4 @@
 transfers
 =========
 
-Transfers: FTP for Humans
+Transfers: Python FTP for Humans
