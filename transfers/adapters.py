@@ -22,26 +22,22 @@ from .ftp.settings import DEFAULT_RETRIES
 from .ftp.connection import FTPConnection
 
 class FTPAdapter(BaseAdapter):
-    """The built-in HTTP Adapter for urllib3.
+    """The built-in FTP Adapter.
 
-    Provides a general-case interface for Requests sessions to contact HTTP and
-    HTTPS urls by implementing the Transport Adapter interface. This class will
-    usually be created by the :class:`Session <Session>` class under the
-    covers.
+    Provides a general-case interface for Transfers sessions to contact FTP and
+    FTPS urls by implementing the Transport Adapter interface.
 
-    :param pool_connections: The number of urllib3 connection pools to cache.
-    :param pool_maxsize: The maximum number of connections to save in the pool.
     :param int max_retries: The maximum number of retries each connection
         should attempt. Note, this applies only to failed connections and
         timeouts, never to requests where the server returns a response.
-    :param pool_block: Whether the connection pool should block for connections.
 
     Usage::
 
       >>> import requests
+      >>> import transfers
       >>> s = requests.Session()
-      >>> a = requests.adapters.HTTPAdapter(max_retries=3)
-      >>> s.mount('http://', a)
+      >>> a = transfers.adapters.FTPAdapter(max_retries=3)
+      >>> s.mount('ftp://', a)
     """
     __attrs__ = ['max_retries', 'config', '_pool_connections', '_pool_maxsize',
                  '_pool_block']
