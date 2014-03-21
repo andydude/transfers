@@ -1,0 +1,19 @@
+{
+    "name": "transfers",
+    "version": "0.1",
+    "author": "Andrew Robbins",
+    "author_email": "andrew@1ticket.com",
+    "url": "http://github.com/andydude/transfers",
+    "download_url": "http://github.com/andydude/transfers",
+    "description": "Python FTP for Humans.",
+
+    "packages": [
+        "transfers",
+        "transfers.packages.ftplib"
+        "transfers.packages.paramiko"
+    ],
+    
+    "install_requires": [
+    	"six"
+    ]
+}
