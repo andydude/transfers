@@ -119,15 +119,15 @@ class FTPResponse(requests.Response):
         return True
 
     @property
-    def ok_preliminary(self):
+    def ok1(self):
         return 100 <= self.status_code < 200
 
     @property
-    def ok_complete(self):
+    def ok2(self):
         return 200 <= self.status_code < 300
 
     @property
-    def ok_intermediate(self):
+    def ok3(self):
         return 300 <= self.status_code < 400
 
     @property

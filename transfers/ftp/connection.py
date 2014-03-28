@@ -9,7 +9,7 @@
 # GNU Lesser General Public License ("LGPLv3") <https://www.gnu.org/licenses/lgpl.html>.
 from __future__ import absolute_import
 """
-transfers.connection
+transfers.ftp.connection
 """
 
 import ftplib
@@ -18,51 +18,9 @@ import six
 import socket
 
 from .models import FTPMessage, FTPRequest, FTPResponse
-from .settings import DEFAULT_PASSIVE, DEFAULT_PORT, DEFAULT_NEWLINE
+from .settings import DEFAULT_BINARY, DEFAULT_PASSIVE, DEFAULT_PORT, DEFAULT_NEWLINE
 
-class FTPConnection(object):
-    scheme = 'ftp'
-    host = ''
-    port = DEFAULT_PORT
-    bufferSize = 8192
-    repType = "ascii"
-    timeout = socket._GLOBAL_DEFAULT_TIMEOUT
-    passive = DEFAULT_PASSIVE
-    history = []
-
-    # Initialization method (called by class instantiation).
-    # Initialize host to localhost, port to standard ftp port
-    # Optional arguments are host (for connect()),
-    # and user, passwd, acct (for login())
-    def __init__(self, host='', port='', user='', passwd='', acct='',
-                 timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
-        self.timeout = timeout
-        if host:
-            self.connect(host)
-            if user:
-                self.login(user, passwd, acct)
-    
-    def close(self):
-        if self.file:
-            self.file.close()
-            self.sock.close()
-            self.file = self.sock = None
-            
-    def connect(self, host='', port='', timeout=None):
-        '''Connect to host.  Arguments are:
-         - host: hostname to connect to (string, default previous host)
-         - port: port to connect to (integer, default previous port)
-        '''
-        if host != '':
-            self.host = host
-        if port != '':
-            self.port = port
-        if timeout:
-            self.timeout = timeout
-        self.sock = socket.create_connection((self.host, self.port), self.timeout)
-        self.file = self.sock.makefile('rb')
-        self.welcome = self._getresponse()
-        return self.welcome
+class FTPTransfersMixin(object):
     
     # ftplib.FTP.getresp
     # ftplib.FTP.voidresp
@@ -149,7 +107,8 @@ class FTPConnection(object):
             resp = self._sendport('PORT', host, port, family)
         else:
             resp = self._sendport('EPRT', host, port, family)
-        return sock, resp
+        connMetadata = {"response": resp}
+        return sock, connMetadata
 
     # ftplib.FTP.makepasv
     def _makepasv(self, family):
@@ -161,7 +120,8 @@ class FTPConnection(object):
             resp = self._request('EPSV')
             host, port = ftplib.parse229(str(resp.raw), self.sock.getpeername())
         conn = socket.create_connection((host, port), self.timeout)
-        return conn, resp, host, port
+        connMetadata = {"response": resp, "host": host, "port": port}
+        return conn, connMetadata
     
     # ftplib.FTP.ntransfercmd
     # ftplib.FTP.transfercmd
@@ -173,15 +133,17 @@ class FTPConnection(object):
         :param url: The URL to connect to.
         :param proxies: (optional) A Requests-style dictionary of proxies used on this request.
         """
+        connCallback = kwargs.get("connCallback")
         passive = kwargs.get("passive", DEFAULT_PASSIVE)
         restartMarker = kwargs.get("restartMarker")
+        connMetadata = {}
         
-        size = None
-        sockaddr = None
         if not passive:
-            sock, _ = self._makeport(self.sock.family)
+            sock, metadata = self._makeport(self.sock.family)
+            connMetadata.update(metadata)
         else:
-            conn, _, _, _ = self._makepasv(self.sock.family)
+            conn, metadata = self._makepasv(self.sock.family)
+            connMetadata.update(metadata)
         if restartMarker is not None:
             self._request("REST", restartMarker)
         resp = self._request(method, *args, **kwargs)
@@ -197,16 +159,21 @@ class FTPConnection(object):
 #         if resp.raw[0] != '1':
 #             raise ftplib.error_reply, resp
         if not passive:
-            conn, sockaddr = sock.accept()
+            conn, connMetadata["sockaddr"] = sock.accept()
         if resp.status_code == 150:
             # this is conditional in case we received a 125
-            size = ftplib.parse150(str(resp.raw))
-        return conn, size, sockaddr
+            connMetadata["size"] = ftplib.parse150(str(resp.raw))
+        if connCallback:
+            newConn = connCallback(conn)
+            if newConn:
+                conn = newConn
+        return conn, connMetadata
     
     # ftplib.FTP.retrbinary
     # ftplib.FTP.retrlines
     def retr(self, method, *args, **kwargs):
-        callback = kwargs.get("callback")
+        connCallback = kwargs.get("connCallback")
+        bufCallback = kwargs.get("callback")
         isBinary = kwargs.get("binary")
         if isBinary is None:
             isBinary = kwargs.get("repType", "ascii")[0].upper() == "I"
@@ -214,23 +181,27 @@ class FTPConnection(object):
         content = ""
         conn, _, _ = self._makeconnection(method, *args, **kwargs)
         data = conn.makefile('rb')
-        while True:
-            if isBinary:
-                buf = data.read(self.bufferSize)
-            else:
-                buf = data.readline()
-            if not buf:
-                break
-            content += buf
-            if not isBinary:
-                if buf[-2:] == DEFAULT_NEWLINE:
-                    buf = buf[:-2]
-                elif buf[-1:] == '\n':
-                    buf = buf[:-1]
-            if callback:
-                callback(buf)
-        data.close()
-        conn.close()
+        try:
+            while True:
+                if isBinary:
+                    buf = data.read(self.bufferSize)
+                else:
+                    buf = data.readline()
+                if not buf:
+                    break
+                content += buf
+                if not isBinary:
+                    if buf[-2:] == DEFAULT_NEWLINE:
+                        buf = buf[:-2]
+                    elif buf[-1:] == '\n':
+                        buf = buf[:-1]
+                if bufCallback:
+                    bufCallback(buf)
+            if connCallback:
+                connCallback(conn)
+        finally:
+            data.close()
+            conn.close()
         resp = self._getresponse(void=True)
         resp._content_consumed = True
         resp._content = content
@@ -239,7 +210,8 @@ class FTPConnection(object):
     # ftplib.FTP.storbinary
     # ftplib.FTP.storlines
     def stor(self, method, *args, **kwargs):
-        callback = kwargs.get("callback")
+        connCallback = kwargs.get("connCallback")
+        bufCallback = kwargs.get("callback")
         isBinary = kwargs.get("binary")
         if isBinary is None:
             isBinary = kwargs.get("repType", "ascii")[0].upper() == "I"
@@ -251,20 +223,27 @@ class FTPConnection(object):
             data = io.BytesIO(data)
 
         conn, _, _ = self._makeconnection(method, *args, **kwargs)
-        while True:
-            if isBinary:
-                buf = data.read(self.bufferSize)
-            else:
-                buf = data.readline()
-            if not buf: break
-            if not isBinary and buf[-2:] != DEFAULT_NEWLINE:
-                if buf[-1] in DEFAULT_NEWLINE: buf = buf[:-1]
-                buf = buf + DEFAULT_NEWLINE
-            conn.sendall(buf)
-            if callback:
-                callback(buf)
-        conn.close()
+        try:
+            while True:
+                if isBinary:
+                    buf = data.read(self.bufferSize)
+                else:
+                    buf = data.readline()
+                if not buf: break
+                if not isBinary and buf[-2:] != DEFAULT_NEWLINE:
+                    if buf[-1] in DEFAULT_NEWLINE: buf = buf[:-1]
+                    buf = buf + DEFAULT_NEWLINE
+                conn.sendall(buf)
+                if bufCallback:
+                    bufCallback(buf)
+            if connCallback:
+                connCallback(conn)
+        finally:
+            conn.close()
         return self._getresponse(void=True)
+
+    def abort(self):
+        return self._request("ABOR")
 
     # kwargs = files=None, data=None, auth=None, hooks=None, 
     def request(self, method, *args, **kwargs):
@@ -308,6 +287,22 @@ class FTPConnection(object):
         else:
             resp = self._request(method, *args, **kwargs)
             return resp
+ 
+    def connect(self, host='', port='', timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+        '''Connect to host.  Arguments are:
+         - host: hostname to connect to (string, default previous host)
+         - port: port to connect to (integer, default previous port)
+        '''
+        if host != '':
+            self.host = host
+        if port != '':
+            self.port = port
+        if timeout != socket._GLOBAL_DEFAULT_TIMEOUT:
+            self.timeout = timeout
+        self.sock = socket.create_connection((self.host, self.port), self.timeout)
+        self.file = self.sock.makefile('rb')
+        self.welcome = self._getresponse()
+        return self.welcome
     
     def login(self, username='', password='', account=''):
         '''Login, default anonymous.'''
@@ -317,13 +312,32 @@ class FTPConnection(object):
         if username == 'anonymous' and password in ('', '-'):
             password = password + 'anonymous@'
         resp = self._request('USER', username)
-        if resp.ok_intermediate:
+        if resp.ok3:
             resp = self._request('PASS', password)
-        if resp.ok_intermediate:
+        if resp.ok3:
             resp = self._request('ACCT', account)
         return resp
-
-    def rename(self, path='', destpath=''):
-        resp = self.request("RNFR", path)
-        resp = self.request("RNTO", destpath)
+    
+    def rename(self, path, destpath):
+        _    = self._request("RNFR", path)
+        resp = self._request("RNTO", destpath)
         return resp
+
+class FTPConnection(ftplib.FTP, FTPTransfersMixin):
+    scheme = 'ftp'
+    host = ''
+    port = DEFAULT_PORT
+    bufferSize = 8192
+    repType = "ascii"
+    timeout = socket._GLOBAL_DEFAULT_TIMEOUT
+    passive = DEFAULT_PASSIVE
+    binary = DEFAULT_BINARY
+    history = []
+
+    abort = FTPTransfersMixin.abort
+    login = FTPTransfersMixin.login
+    rename = FTPTransfersMixin.rename
+    connect = FTPTransfersMixin.connect
+    
+    #def __init__(self, host='', user='', passwd='', acct='', timeout=socket._GLOBAL_DEFAULT_TIMEOUT):
+    

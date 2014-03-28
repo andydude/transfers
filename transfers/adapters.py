@@ -39,10 +39,10 @@ class FTPAdapter(BaseAdapter):
       >>> a = transfers.adapters.FTPAdapter(max_retries=3)
       >>> s.mount('ftp://', a)
     """
-    __attrs__ = ['max_retries', 'config', '_pool_connections', '_pool_maxsize',
-                 '_pool_block']
+    __attrs__ = ['max_retries', 'config']
 
-    def __init__(self, max_retries=DEFAULT_RETRIES):
+    def __init__(self, max_retries=DEFAULT_RETRIES, conn_cls=None):
+        self.conn_cls = conn_cls
         self.max_retries = max_retries
         super(FTPAdapter, self).__init__()
 
@@ -51,17 +51,25 @@ class FTPAdapter(BaseAdapter):
         """
         pass
 
+    def get_connection_class(self, scheme, auth=None, proxies=None):
+        ConnectionCls = None
+        if self.conn_cls:
+            ConnectionCls = self.conn_cls
+        elif scheme == "ftp":
+            ConnectionCls = FTPConnection
+        elif scheme == "ftps":
+            from .ftps.connection import FTPSConnection
+            ConnectionCls = FTPSConnection
+        elif scheme == "sftp":
+            from .sftp.connection import SFTPConnection
+            ConnectionCls = SFTPConnection
+        elif scheme == "file":
+            from .file.connection import FileConnection
+            ConnectionCls = FileConnection
+        return ConnectionCls
+    
     def get_connection(self, url, auth=None, proxies=None):
         parsedUrl = parse_url(url)
-        
-        if parsedUrl.scheme == "ftp":
-            ConnectionCls = FTPConnection
-        elif parsedUrl.scheme == "ftps":
-            ConnectionCls = None
-        elif parsedUrl.scheme == "sftp":
-            ConnectionCls = None
-        elif parsedUrl.scheme == "file":
-            ConnectionCls = None
 
         username = ''
         password = ''
@@ -74,6 +82,7 @@ class FTPAdapter(BaseAdapter):
             if len(auth) == 3: 
                 account = auth[2]
             
+        ConnectionCls = self.get_connection_class(parsedUrl.scheme, auth, proxies)
         conn = ConnectionCls(host=parsedUrl.host,
                              port=parsedUrl.port,
                              user=username,
@@ -96,28 +105,11 @@ class FTPAdapter(BaseAdapter):
         #self.cert_verify(conn, request.url, verify, cert)
         #url = self.request_url(request, proxies)
 
-#         if stream:
-#             timeout = TimeoutSauce(connect=timeout)
-#         else:
-#             timeout = TimeoutSauce(connect=timeout, read=timeout)
         #TODO, cwd(parsedUrl.path)
         try:
             r = conn.request(request.method, *request.args)
         except socket.error as sockerr:
             raise ConnectionError(sockerr, request=request)
-#         except MaxRetryError as e:
-#             raise ConnectionError(e, request=request)
-# 
-#         except _ProxyError as e:
-#             raise ProxyError(e)
-# 
-#         except (_SSLError, _HTTPError) as e:
-#             if isinstance(e, _SSLError):
-#                 raise SSLError(e, request=request)
-#             elif isinstance(e, TimeoutError):
-#                 raise Timeout(e, request=request)
-#             else:
-#                 raise
 
         if not stream:
             r.content

@@ -9,5 +9,5 @@
 # GNU Lesser General Public License ("LGPLv3") <https://www.gnu.org/licenses/lgpl.html>.
 from __future__ import absolute_import
 """
-transfers.ftp
+transfers.file
 """
