@@ -12,6 +12,10 @@ from __future__ import absolute_import
 transfers.sftp.settings
 """
 
+DEFAULT_PATH = "/"
+DEFAULT_SYMBOLIC = True
+DEFAULT_FOLLOW = True
+
 import paramiko
 
 FTP_TO_SFTP_CODE = {

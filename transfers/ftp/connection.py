@@ -20,11 +20,26 @@ import socket
 from .models import FTPMessage, FTPRequest, FTPResponse
 from .settings import DEFAULT_BINARY, DEFAULT_PASSIVE, DEFAULT_PORT, DEFAULT_NEWLINE
 
+SOCKET_ADDRESS_FAMILIES = [
+    None,
+    socket.AF_INET,
+    socket.AF_INET6,
+]
+
 class FTPTransfersMixin(object):
     
     # ftplib.FTP.getresp
     # ftplib.FTP.voidresp
     def _getresponse(self, **kwargs):
+        """
+        getresponse() - this is the core abstraction.
+        
+        There are several methods that use this function internally:
+          - _request() - to wrap raw requests
+          - retr() - for GET-related things
+          - stor() - for PUT-related things
+          - connect() - 
+        """
         response = FTPResponse()
         response.raw = FTPMessage(self.file)
         response.status_code = response.raw.status
@@ -66,12 +81,9 @@ class FTPTransfersMixin(object):
             hostport = ','.join(hbytes + pbytes)
             return self._request(method, hostport)
         elif method == "EPRT":
-            af = 0
-            if family == socket.AF_INET:
-                af = 1
-            elif family == socket.AF_INET6:
-                af = 2
-            if af == 0:
+            try:
+                af = SOCKET_ADDRESS_FAMILIES.index(family)
+            except ValueError:
                 raise ftplib.error_proto, 'unsupported address family'
             fields = ['', repr(af), host, repr(port), '']
             hostport = '|'.join(fields)
@@ -324,6 +336,54 @@ class FTPTransfersMixin(object):
         return resp
 
 class FTPConnection(ftplib.FTP, FTPTransfersMixin):
+    """
+    transfers.ftp.connection.FTPConnection
+
+    This represents the primary control channel over which most FTP commands are sent.
+
+    It has the following constants:
+      - scheme (constant for each connection class)
+      - defaultPort (constant for each connection class)
+
+    It has the following readonly state:
+      - current system (readonly, response of SYST command)
+      - current welcome (readonly, response immediately after connect)
+
+    It has the following global state:
+      - current auth (username, password, account)
+      - current host (hostname, ipaddress, port)
+      - current path (expected output of the PWD command)
+      - current passive (whether to use PORT or PASV)
+      - current binary (simplification of repType)
+      - current follow (whether to follow symbolic links)
+      - current timeout (may include connect, send, wait, receive timeouts)
+      - current bufferSize (may include ssl, send, receive buffer sizes)
+      - current logLevel (may be anything from 0 to 10)
+      - current debugLevel (may be 0, 1, 2)
+
+    It has the following transfer state:
+      - current repType (the first argument to the TYPE command)
+      - current repForm (the second argument to the TYPE A command)
+      - current repByteSize (the second argument to the TYPE L command)
+      - current fileStructure (argument to the STRU command)
+      - current transferMode (argument to the MODE command)
+      - current restartMark (argument to the REST command)
+      - current fileGlob (expansion of local file names)
+      - current preserve (modification time of retrieved files)
+      - current allocate (whether to use ALLO command)
+      - current append (whether to use APPE command)
+      - current unique (whether to use STOU command)
+
+    It has the following security state:
+      - current certFile (SSL certificate file)
+      - current keyFile (SSL private key file)
+      - current secure (whether to use the AUTH command)
+      - current protect (whether to wrap the socket with SSL)
+      - current verify (whether or not to verify the connection)
+      - current version (ssl_version parameter to ssl.wrap_socket)
+      - current authType (the first argument to the AUTH command)
+    """
+
     scheme = 'ftp'
     host = ''
     port = DEFAULT_PORT
