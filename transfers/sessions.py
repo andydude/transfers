@@ -172,7 +172,7 @@ class FTPSession(requests.Session):
         resp = self.send(preq, **send_kwargs)
         return resp
 
-    def send(self, request, **kwargs):
+    def send(self, request, *args, **kwargs):
         """Send a given PreparedRequest."""
         # Set defaults that the hooks can utilize to ensure they always have
         # the correct parameters to reproduce the previous request.
@@ -194,13 +194,13 @@ class FTPSession(requests.Session):
         start = datetime.utcnow()
 
         # Send the request
-        r = adapter.send(request, **kwargs)
+        r = adapter.send(request, *args, **kwargs)
 
         # Total elapsed time of the request (approximately)
         r.elapsed = datetime.utcnow() - start
 
         # Response manipulation hooks
-        r = dispatch_hook('response', request.hooks, r, **kwargs)
+        r = dispatch_hook('response', request.hooks, r, *args, **kwargs)
 
         # Resolve redirects if allowed.
         history = []
@@ -264,36 +264,36 @@ class FTPSession(requests.Session):
 
     # ftplib.FTP.retrbinary
     # ftplib.FTP.retrlines
-    def get(self, url, **kwargs):
+    def get(self, url, *args, **kwargs):
         """Sends a RETR request. Returns :class:`FTPResponse` object.
 
         :param url: URL for the new :class:`Request` object.
         :param \*\*kwargs: Optional arguments that ``request`` takes.
         """
 
-        return self.request('RETR', url, **kwargs)
+        return self.request('RETR', url, *args, **kwargs)
 
     # ftplib.FTP.storbinary
     # ftplib.FTP.storlines
-    def put(self, url, data=None, append=False, unique=False, **kwargs):
+    def put(self, url, data=None, append=False, unique=False, *args, **kwargs):
         """Sends a STOR request. Returns :class:`FTPResponse` object.
 
         :param url: URL for the new :class:`Request` object.
         :param \*\*kwargs: Optional arguments that ``request`` takes.
         """
 
-        return self.request('STOR', url, data=data, **kwargs)
+        return self.request('STOR', url, data=data, *args, **kwargs)
 
-    def abort(self, **kwargs):
+    def abort(self, *args, **kwargs):
         """Sends a ABOR request. Returns :class:`FTPResponse` object.
 
         :param url: URL for the new :class:`Request` object.
         :param \*\*kwargs: Optional arguments that ``request`` takes.
         """
 
-        return self.request('ABOR', **kwargs)
+        return self.request('ABOR', *args, **kwargs)
 
-    def connect(self, url, **kwargs):
+    def connect(self, url, *args, **kwargs):
         """Sends a HEAD request. Returns :class:`FTPResponse` object.
 
         :param url: URL for the new :class:`Request` object.
@@ -301,9 +301,9 @@ class FTPSession(requests.Session):
         """
 
         # TODO: parse URL into (host, port)
-        return self.request('__CONNECT', url, **kwargs)
+        return self.request('__CONNECT', url, *args, **kwargs)
 
-    def cwd(self, url, **kwargs):
+    def cwd(self, url, *args, **kwargs):
         """Sends a HEAD request. Returns :class:`FTPResponse` object.
 
         :param url: URL for the new :class:`Request` object.
@@ -311,100 +311,27 @@ class FTPSession(requests.Session):
         """
 
         kwargs.setdefault('allow_redirects', False)
-        return self.request('CWD', url, **kwargs)
+        return self.request('CWD', url, *args, **kwargs)
 
-    def delete(self, url, **kwargs):
+    def delete(self, url, *args, **kwargs):
         """Sends a HEAD request. Returns :class:`FTPResponse` object.
 
         :param url: URL for the new :class:`Request` object.
         :param \*\*kwargs: Optional arguments that ``request`` takes.
         """
 
-        return self.request('DELE', url, **kwargs)
+        return self.request('DELE', url, *args, **kwargs)
 
-    def feature(self, url, **kwargs):
+    def feature(self, url, *args, **kwargs):
         """Sends a HEAD request. Returns :class:`FTPResponse` object.
 
         :param url: URL for the new :class:`Request` object.
         :param \*\*kwargs: Optional arguments that ``request`` takes.
         """
 
-        return self.request('FEAT', url, **kwargs)
+        return self.request('FEAT', url, *args, **kwargs)
 
-    def help(self, url, **kwargs):
-        """Sends a HEAD request. Returns :class:`FTPResponse` object.
-
-        :param url: URL for the new :class:`Request` object.
-        :param \*\*kwargs: Optional arguments that ``request`` takes.
-        """
-
-        kwargs.setdefault('allow_redirects', False)
-        return self.request('HELP', url, **kwargs)
-
-    def login(self, url, **kwargs):
-        """Sends a HEAD request. Returns :class:`FTPResponse` object.
-
-        :param url: URL for the new :class:`Request` object.
-        :param \*\*kwargs: Optional arguments that ``request`` takes.
-        """
-
-        return self.request('__LOGIN', url, **kwargs)
-
-    def makeport(self, **kwargs):
-        """Sends a HEAD request. Returns :class:`FTPResponse` object.
-
-        :param url: URL for the new :class:`Request` object.
-        :param \*\*kwargs: Optional arguments that ``request`` takes.
-        """
-
-        return self.request('PORT', **kwargs)
-
-    def makepasv(self, **kwargs):
-        """Sends a HEAD request. Returns :class:`FTPResponse` object.
-
-        :param url: URL for the new :class:`Request` object.
-        :param \*\*kwargs: Optional arguments that ``request`` takes.
-        """
-
-        return self.request('PASV', **kwargs)
-
-    def makeeprt(self, **kwargs):
-        """Sends a HEAD request. Returns :class:`FTPResponse` object.
-
-        :param url: URL for the new :class:`Request` object.
-        :param \*\*kwargs: Optional arguments that ``request`` takes.
-        """
-
-        return self.request('EPRT', **kwargs)
-
-    def makeepsv(self, **kwargs):
-        """Sends a HEAD request. Returns :class:`FTPResponse` object.
-
-        :param url: URL for the new :class:`Request` object.
-        :param \*\*kwargs: Optional arguments that ``request`` takes.
-        """
-
-        return self.request('EPSV', **kwargs)
-
-    def mkd(self, url, **kwargs):
-        """Sends a HEAD request. Returns :class:`FTPResponse` object.
-
-        :param url: URL for the new :class:`Request` object.
-        :param \*\*kwargs: Optional arguments that ``request`` takes.
-        """
-
-        return self.request('MKD', url, **kwargs)
-
-    def options(self, url, **kwargs):
-        """Sends a HEAD request. Returns :class:`FTPResponse` object.
-
-        :param url: URL for the new :class:`Request` object.
-        :param \*\*kwargs: Optional arguments that ``request`` takes.
-        """
-
-        return self.request('OPTS', url, **kwargs)
-
-    def pwd(self, url, **kwargs):
+    def help(self, url, *args, **kwargs):
         """Sends a HEAD request. Returns :class:`FTPResponse` object.
 
         :param url: URL for the new :class:`Request` object.
@@ -412,49 +339,122 @@ class FTPSession(requests.Session):
         """
 
         kwargs.setdefault('allow_redirects', False)
-        return self.request('PWD', url, **kwargs)
+        return self.request('HELP', url, *args, **kwargs)
 
-    def quit(self, url, **kwargs):
+    def login(self, *args, **kwargs):
         """Sends a HEAD request. Returns :class:`FTPResponse` object.
 
         :param url: URL for the new :class:`Request` object.
         :param \*\*kwargs: Optional arguments that ``request`` takes.
         """
 
-        return self.request('QUIT', url, **kwargs)
+        return self.request('__LOGIN', *args, **kwargs)
 
-    def rmd(self, url, **kwargs):
+    def makeport(self, *args, **kwargs):
         """Sends a HEAD request. Returns :class:`FTPResponse` object.
 
         :param url: URL for the new :class:`Request` object.
         :param \*\*kwargs: Optional arguments that ``request`` takes.
         """
 
-        return self.request('RMD', url, **kwargs)
+        return self.request('PORT', *args, **kwargs)
 
-    def rename(self, url, desturl, **kwargs):
+    def makepasv(self, *args, **kwargs):
         """Sends a HEAD request. Returns :class:`FTPResponse` object.
 
         :param url: URL for the new :class:`Request` object.
         :param \*\*kwargs: Optional arguments that ``request`` takes.
         """
 
-        return self.request('__RENAME', url, desturl, **kwargs)
+        return self.request('PASV', *args, **kwargs)
 
-    def size(self, url, **kwargs):
+    def makeeprt(self, *args, **kwargs):
         """Sends a HEAD request. Returns :class:`FTPResponse` object.
 
         :param url: URL for the new :class:`Request` object.
         :param \*\*kwargs: Optional arguments that ``request`` takes.
         """
 
-        return self.request('SIZE', url, **kwargs)
+        return self.request('EPRT', *args, **kwargs)
 
-    def stat(self, url, **kwargs):
+    def makeepsv(self, *args, **kwargs):
         """Sends a HEAD request. Returns :class:`FTPResponse` object.
 
         :param url: URL for the new :class:`Request` object.
         :param \*\*kwargs: Optional arguments that ``request`` takes.
         """
 
-        return self.request('STAT', url, **kwargs)
+        return self.request('EPSV', *args, **kwargs)
+
+    def mkd(self, url, *args, **kwargs):
+        """Sends a HEAD request. Returns :class:`FTPResponse` object.
+
+        :param url: URL for the new :class:`Request` object.
+        :param \*\*kwargs: Optional arguments that ``request`` takes.
+        """
+
+        return self.request('MKD', url, *args, **kwargs)
+
+    def options(self, url, *args, **kwargs):
+        """Sends a HEAD request. Returns :class:`FTPResponse` object.
+
+        :param url: URL for the new :class:`Request` object.
+        :param \*\*kwargs: Optional arguments that ``request`` takes.
+        """
+
+        return self.request('OPTS', url, *args, **kwargs)
+
+    def pwd(self, url, *args, **kwargs):
+        """Sends a HEAD request. Returns :class:`FTPResponse` object.
+
+        :param url: URL for the new :class:`Request` object.
+        :param \*\*kwargs: Optional arguments that ``request`` takes.
+        """
+
+        kwargs.setdefault('allow_redirects', False)
+        return self.request('PWD', url, *args, **kwargs)
+
+    def quit(self, url, *args, **kwargs):
+        """Sends a HEAD request. Returns :class:`FTPResponse` object.
+
+        :param url: URL for the new :class:`Request` object.
+        :param \*\*kwargs: Optional arguments that ``request`` takes.
+        """
+
+        return self.request('QUIT', url, *args, **kwargs)
+
+    def rmd(self, url, *args, **kwargs):
+        """Sends a HEAD request. Returns :class:`FTPResponse` object.
+
+        :param url: URL for the new :class:`Request` object.
+        :param \*\*kwargs: Optional arguments that ``request`` takes.
+        """
+
+        return self.request('RMD', url, *args, **kwargs)
+
+    def rename(self, url, desturl, *args, **kwargs):
+        """Sends a HEAD request. Returns :class:`FTPResponse` object.
+
+        :param url: URL for the new :class:`Request` object.
+        :param \*\*kwargs: Optional arguments that ``request`` takes.
+        """
+
+        return self.request('__RENAME', url, desturl, *args, **kwargs)
+
+    def size(self, url, *args, **kwargs):
+        """Sends a HEAD request. Returns :class:`FTPResponse` object.
+
+        :param url: URL for the new :class:`Request` object.
+        :param \*\*kwargs: Optional arguments that ``request`` takes.
+        """
+
+        return self.request('SIZE', url, *args, **kwargs)
+
+    def stat(self, url, *args, **kwargs):
+        """Sends a HEAD request. Returns :class:`FTPResponse` object.
+
+        :param url: URL for the new :class:`Request` object.
+        :param \*\*kwargs: Optional arguments that ``request`` takes.
+        """
+
+        return self.request('STAT', url, *args, **kwargs)

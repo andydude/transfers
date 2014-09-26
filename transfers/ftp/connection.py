@@ -109,7 +109,7 @@ class FTPTransfersMixin(object):
         return sock
 
     # ftplib.FTP.makeport
-    def _makeport(self, family):
+    def makeport(self, family):
         '''Create a new socket and send a PORT/EPRT command for it.'''
         sock = self._makesocket(family)
         sock.listen(1)
@@ -123,7 +123,7 @@ class FTPTransfersMixin(object):
         return sock, connMetadata
 
     # ftplib.FTP.makepasv
-    def _makepasv(self, family):
+    def makepasv(self, family):
         '''Create a new connection and send a PASV/EPSV command for it.'''
         if family == socket.AF_INET:
             resp = self._request('PASV')
@@ -137,7 +137,7 @@ class FTPTransfersMixin(object):
     
     # ftplib.FTP.ntransfercmd
     # ftplib.FTP.transfercmd
-    def _makeconnection(self, method, *args, **kwargs):
+    def transfer(self, method, *args, **kwargs):
         """Returns a urllib3 connection for the given URL. This should not be
         called from user code, and is only exposed for use when subclassing the
         :class:`HTTPAdapter <requests.adapters.HTTPAdapter>`.
@@ -151,10 +151,10 @@ class FTPTransfersMixin(object):
         connMetadata = {}
         
         if not passive:
-            sock, metadata = self._makeport(self.sock.family)
+            sock, metadata = self.makeport(self.sock.family)
             connMetadata.update(metadata)
         else:
-            conn, metadata = self._makepasv(self.sock.family)
+            conn, metadata = self.makepasv(self.sock.family)
             connMetadata.update(metadata)
         if restartMarker is not None:
             self._request("REST", restartMarker)
@@ -191,7 +191,7 @@ class FTPTransfersMixin(object):
             isBinary = kwargs.get("repType", "ascii")[0].upper() == "I"
         
         content = ""
-        conn, _, _ = self._makeconnection(method, *args, **kwargs)
+        conn, _ = self.transfer(method, *args, **kwargs)
         data = conn.makefile('rb')
         try:
             while True:
@@ -234,7 +234,7 @@ class FTPTransfersMixin(object):
         if isinstance(data, six.binary_type):
             data = io.BytesIO(data)
 
-        conn, _, _ = self._makeconnection(method, *args, **kwargs)
+        conn, _ = self.transfer(method, *args, **kwargs)
         try:
             while True:
                 if isBinary:
@@ -309,8 +309,7 @@ class FTPTransfersMixin(object):
             self.host = host
         if port != '':
             self.port = port
-        if timeout != socket._GLOBAL_DEFAULT_TIMEOUT:
-            self.timeout = timeout
+        self.timeout = timeout
         self.sock = socket.create_connection((self.host, self.port), self.timeout)
         self.file = self.sock.makefile('rb')
         self.welcome = self._getresponse()
@@ -335,7 +334,7 @@ class FTPTransfersMixin(object):
         resp = self._request("RNTO", destpath)
         return resp
 
-class FTPConnection(ftplib.FTP, FTPTransfersMixin):
+class FTPConnection(FTPTransfersMixin):
     """
     transfers.ftp.connection.FTPConnection
 

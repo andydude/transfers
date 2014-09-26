@@ -21,7 +21,7 @@ from .exceptions import FTPError
 class FTPMessage(object):
     status = 200
     reason = "OK"
-    body = False
+    body = None
     
     def __init__(self, obj):
         if isinstance(obj, basestring):

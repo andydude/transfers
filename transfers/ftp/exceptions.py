@@ -10,8 +10,8 @@
 from __future__ import absolute_import
 
 
-class TransferError(Exception):
+class TransfersError(Exception):
     pass
 
-class FTPError(TransferError):
+class FTPError(TransfersError):
     pass
